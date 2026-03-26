@@ -11,7 +11,7 @@ from firebase_admin import credentials, firestore
 # Upload your serviceAccountKey.json as a Render Secret File
 # Render will place it at /opt/render/secrets/serviceAccountKey.json
 
-cred = credentials.Certificate("/opt/render/secrets/serviceAccountKey.json")
+cred = credentials.Certificate("/etc/secrets/serviceAccountKey.json")
 
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
