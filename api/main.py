@@ -1,6 +1,7 @@
 import os
 import shutil
 import uuid
+from typing import List
 from fastapi import FastAPI, UploadFile, File, HTTPException
 
 from model.embedding_model import load_database, recognize_speaker, add_new_user
@@ -13,7 +14,6 @@ database = None
 # ================================
 # LOAD MODEL
 # ================================
-
 def load_model():
 
     global database
@@ -30,44 +30,39 @@ load_model()
 
 
 # ================================
-# REGISTER VOICE
+# REGISTER VOICE (UPDATED)
 # ================================
-
 @app.post("/register_voice")
 
-async def register_voice(username: str, file: UploadFile = File(...)):
+async def register_voice(username: str, files: List[UploadFile] = File(...)):
 
     global database
 
-    temp_file = f"temp_{uuid.uuid4()}.wav"
+    sample_count = 0
+    trained = False
 
-    with open(temp_file, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    for file in files:
 
-    database, sample_count, trained = add_new_user(username, temp_file)
+        temp_file = f"temp_{uuid.uuid4()}.wav"
 
-    os.remove(temp_file)
+        with open(temp_file, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    if not trained:
+        database, sample_count, trained = add_new_user(username, temp_file)
 
-        return {
-            "status": "training_in_progress",
-            "user": username,
-            "samples_recorded": sample_count,
-            "samples_required": 15
-        }
+        os.remove(temp_file)
 
     return {
-        "status": "training_complete",
+        "status": "training_complete" if trained else "training_in_progress",
         "user": username,
-        "samples_recorded": sample_count
+        "samples_recorded": sample_count,
+        "samples_required": 15
     }
 
 
 # ================================
-# VOICE RECOGNITION
+# VOICE RECOGNITION (UNCHANGED)
 # ================================
-
 @app.post("/recognize_voice")
 
 async def recognize_voice(file: UploadFile = File(...)):

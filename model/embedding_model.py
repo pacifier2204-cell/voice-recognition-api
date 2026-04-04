@@ -1,6 +1,7 @@
 import os
 import numpy as np
-from resemblyzer import VoiceEncoder, preprocess_wav
+import librosa
+from resemblyzer import VoiceEncoder
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -8,8 +9,6 @@ from firebase_admin import credentials, firestore
 # ================================
 # FIREBASE INIT (RENDER SECRET FILE)
 # ================================
-# Upload your serviceAccountKey.json as a Render Secret File
-# Render will place it at /opt/render/secrets/serviceAccountKey.json
 
 cred = credentials.Certificate("/etc/secrets/serviceAccountKey.json")
 
@@ -51,7 +50,8 @@ def load_database():
 # ================================
 def add_new_user(username, file_path):
 
-    wav = preprocess_wav(file_path)
+    # 🔥 FIX: support any audio format
+    wav, sr = librosa.load(file_path, sr=16000)
     embed = encoder.embed_utterance(wav)
 
     user_ref = db.collection("voice_embeddings").document(username)
@@ -87,7 +87,8 @@ def add_new_user(username, file_path):
 # ================================
 def recognize_speaker(file_path, database):
 
-    wav = preprocess_wav(file_path)
+    # 🔥 FIX: support any audio format
+    wav, sr = librosa.load(file_path, sr=16000)
 
     if len(wav) < 16000:
         return "Invalid", 0.0, 0.0
@@ -108,6 +109,10 @@ def recognize_speaker(file_path, database):
 
         top_k = sorted(scores, reverse=True)[:3]
         user_scores[user] = np.mean(top_k)
+
+    # 🔥 FIX: prevent crash if empty
+    if not user_scores:
+        return "Unknown", 0.0, 0.0
 
     sorted_users = sorted(user_scores.items(), key=lambda x: x[1], reverse=True)
 
