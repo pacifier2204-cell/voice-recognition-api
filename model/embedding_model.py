@@ -7,9 +7,8 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ================================
-# FIREBASE INIT (RENDER SECRET FILE)
+# FIREBASE INIT
 # ================================
-
 cred = credentials.Certificate("/etc/secrets/serviceAccountKey.json")
 
 if not firebase_admin._apps:
@@ -50,7 +49,7 @@ def load_database():
 # ================================
 def add_new_user(username, file_path):
 
-    # 🔥 FIX: support any audio format
+    # ✅ Supports any audio format
     wav, sr = librosa.load(file_path, sr=16000)
     embed = encoder.embed_utterance(wav)
 
@@ -87,7 +86,7 @@ def add_new_user(username, file_path):
 # ================================
 def recognize_speaker(file_path, database):
 
-    # 🔥 FIX: support any audio format
+    # ✅ Supports any audio format
     wav, sr = librosa.load(file_path, sr=16000)
 
     if len(wav) < 16000:
@@ -110,7 +109,7 @@ def recognize_speaker(file_path, database):
         top_k = sorted(scores, reverse=True)[:3]
         user_scores[user] = np.mean(top_k)
 
-    # 🔥 FIX: prevent crash if empty
+    # ✅ Prevent crash
     if not user_scores:
         return "Unknown", 0.0, 0.0
 

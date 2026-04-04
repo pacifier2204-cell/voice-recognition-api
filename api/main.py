@@ -15,7 +15,6 @@ database = None
 # LOAD MODEL
 # ================================
 def load_model():
-
     global database
 
     database = load_database()
@@ -30,10 +29,9 @@ load_model()
 
 
 # ================================
-# REGISTER VOICE (UPDATED)
+# REGISTER VOICE (FINAL FIXED)
 # ================================
 @app.post("/register_voice")
-
 async def register_voice(username: str, files: List[UploadFile] = File(...)):
 
     global database
@@ -43,7 +41,8 @@ async def register_voice(username: str, files: List[UploadFile] = File(...)):
 
     for file in files:
 
-        temp_file = f"temp_{uuid.uuid4()}.wav"
+        # ✅ KEEP ORIGINAL FORMAT (IMPORTANT FIX)
+        temp_file = f"temp_{uuid.uuid4()}_{file.filename}"
 
         with open(temp_file, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -51,6 +50,9 @@ async def register_voice(username: str, files: List[UploadFile] = File(...)):
         database, sample_count, trained = add_new_user(username, temp_file)
 
         os.remove(temp_file)
+
+    # ✅ RELOAD DATABASE AFTER TRAINING
+    database = load_database()
 
     return {
         "status": "training_complete" if trained else "training_in_progress",
@@ -61,10 +63,9 @@ async def register_voice(username: str, files: List[UploadFile] = File(...)):
 
 
 # ================================
-# VOICE RECOGNITION (UNCHANGED)
+# VOICE RECOGNITION
 # ================================
 @app.post("/recognize_voice")
-
 async def recognize_voice(file: UploadFile = File(...)):
 
     global database
@@ -72,7 +73,8 @@ async def recognize_voice(file: UploadFile = File(...)):
     if database is None:
         raise HTTPException(status_code=400, detail="Model not ready.")
 
-    temp_file = f"temp_{uuid.uuid4()}.wav"
+    # ✅ KEEP ORIGINAL FORMAT
+    temp_file = f"temp_{uuid.uuid4()}_{file.filename}"
 
     with open(temp_file, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
