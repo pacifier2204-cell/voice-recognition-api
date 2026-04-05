@@ -25,6 +25,42 @@ def load_model():
 
 load_model()
 
+import subprocess
+
+@app.get("/")
+def health_check():
+    return {
+        "status": "online",
+        "trained_users": len(database) if database else 0
+    }
+
+@app.get("/check_setup")
+def check_setup():
+    try:
+        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
+        ffmpeg_ok = "ffmpeg version" in result.stdout
+    except:
+        ffmpeg_ok = False
+
+    try:
+        from resemblyzer import VoiceEncoder
+        resemblyzer_ok = True
+    except:
+        resemblyzer_ok = False
+
+    try:
+        docs = list(db.collection("voice_embeddings").limit(1).stream())
+        firebase_ok = True
+    except:
+        firebase_ok = False
+
+    return {
+        "ffmpeg": ffmpeg_ok,
+        "resemblyzer": resemblyzer_ok,
+        "firebase": firebase_ok,
+        "database_loaded": database is not None,
+        "trained_users": len(database) if database else 0
+    }
 
 # ================================
 # REGISTER VOICE
