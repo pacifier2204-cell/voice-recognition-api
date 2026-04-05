@@ -16,20 +16,18 @@ database = None
 # ================================
 def load_model():
     global database
-
     database = load_database()
-
-    if database is None:
+    if not database:
         print("No embeddings found.")
     else:
-        print("Embeddings loaded successfully")
+        print(f"Embeddings loaded for {len(database)} users.")
 
 
 load_model()
 
 
 # ================================
-# REGISTER VOICE (FINAL FIXED)
+# REGISTER VOICE
 # ================================
 @app.post("/register_voice")
 async def register_voice(username: str, files: List[UploadFile] = File(...)):
@@ -38,20 +36,26 @@ async def register_voice(username: str, files: List[UploadFile] = File(...)):
 
     sample_count = 0
     trained = False
+    temp_files = []
 
-    for file in files:
+    try:
+        for file in files:
+            temp_file = f"temp_{uuid.uuid4()}_{file.filename}"
+            temp_files.append(temp_file)
 
-        # ✅ KEEP ORIGINAL FORMAT (IMPORTANT FIX)
-        temp_file = f"temp_{uuid.uuid4()}_{file.filename}"
+            with open(temp_file, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
 
-        with open(temp_file, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            # Call add_new_user per file — core logic unchanged
+            _, sample_count, trained = add_new_user(username, temp_file)
 
-        database, sample_count, trained = add_new_user(username, temp_file)
+    finally:
+        # ✅ Always clean up temp files, even if an exception occurred
+        for f in temp_files:
+            if os.path.exists(f):
+                os.remove(f)
 
-        os.remove(temp_file)
-
-    # ✅ RELOAD DATABASE AFTER TRAINING
+    # ✅ Single reload after all files in batch are processed
     database = load_database()
 
     return {
@@ -70,16 +74,22 @@ async def recognize_voice(file: UploadFile = File(...)):
 
     global database
 
-    if database is None:
-        raise HTTPException(status_code=400, detail="Model not ready.")
+    # ✅ Treat empty dict same as None — server is ready, just no trained users
+    if not database:
+        raise HTTPException(status_code=400, detail="No trained voice profiles found.")
 
-    # ✅ KEEP ORIGINAL FORMAT
     temp_file = f"temp_{uuid.uuid4()}_{file.filename}"
 
-    with open(temp_file, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        with open(temp_file, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    user, confidence, margin = recognize_speaker(temp_file, database)
+        user, confidence, margin = recognize_speaker(temp_file, database)
+
+    finally:
+        # ✅ Always clean up
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
     base_threshold = 0.88
 
@@ -101,8 +111,6 @@ async def recognize_voice(file: UploadFile = File(...)):
     else:
         user = "Unknown"
         status = "not_recognized"
-
-    os.remove(temp_file)
 
     return {
         "recognized_user": user,

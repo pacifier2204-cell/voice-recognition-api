@@ -17,7 +17,6 @@ if not firebase_admin._apps:
 db = firestore.client()
 encoder = VoiceEncoder()
 
-# Training rules
 MIN_TRAINING_SAMPLES = 15
 MAX_STORED_SAMPLES = 25
 
@@ -38,9 +37,7 @@ def load_database():
         embeddings = data["embeddings"]
         database[user.id] = [np.array(e) for e in embeddings]
 
-    if len(database) == 0:
-        return None
-
+    # ✅ Return empty dict instead of None — callers use `if not database`
     return database
 
 
@@ -49,9 +46,15 @@ def load_database():
 # ================================
 def add_new_user(username, file_path):
 
-    # ✅ Supports any audio format
+    # ✅ Trim silence before embedding — fixes leading silence from Android mic
     wav, sr = librosa.load(file_path, sr=16000)
-    wav = wav[:16000 * 3] 
+    wav, _ = librosa.effects.trim(wav, top_db=20)  # Remove silence
+    wav = wav[:16000 * 4]  # ✅ Extended to 4s to match your Android recording limit
+
+    # ✅ Guard: skip if audio too short after trimming
+    if len(wav) < 8000:  # Less than 0.5 seconds
+        raise ValueError(f"Audio too short after silence removal: {file_path}")
+
     embed = encoder.embed_utterance(wav)
 
     user_ref = db.collection("voice_embeddings").document(username)
@@ -79,7 +82,8 @@ def add_new_user(username, file_path):
         "trained": trained
     })
 
-    return load_database(), sample_count, trained
+    # ✅ Don't call load_database() here anymore — main.py does it once after batch
+    return None, sample_count, trained
 
 
 # ================================
@@ -87,9 +91,10 @@ def add_new_user(username, file_path):
 # ================================
 def recognize_speaker(file_path, database):
 
-    # ✅ Supports any audio format
+    # ✅ Same silence trimming as training for consistency
     wav, sr = librosa.load(file_path, sr=16000)
-    wav = wav[:16000 * 3] 
+    wav, _ = librosa.effects.trim(wav, top_db=20)
+    wav = wav[:16000 * 4]
 
     if len(wav) < 16000:
         return "Invalid", 0.0, 0.0
@@ -99,9 +104,7 @@ def recognize_speaker(file_path, database):
     user_scores = {}
 
     for user, embeddings in database.items():
-
         scores = []
-
         for db_embed in embeddings:
             score = np.dot(embed, db_embed) / (
                 np.linalg.norm(embed) * np.linalg.norm(db_embed)
@@ -111,14 +114,13 @@ def recognize_speaker(file_path, database):
         top_k = sorted(scores, reverse=True)[:3]
         user_scores[user] = np.mean(top_k)
 
-    # ✅ Prevent crash
     if not user_scores:
         return "Unknown", 0.0, 0.0
 
     sorted_users = sorted(user_scores.items(), key=lambda x: x[1], reverse=True)
 
     best_user, best_score = sorted_users[0]
-    second_score = sorted_users[1][1] if len(sorted_users) > 1 else 0
+    second_score = sorted_users[1][1] if len(sorted_users) > 1 else 0.0
 
     margin = best_score - second_score
 
