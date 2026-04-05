@@ -51,6 +51,7 @@ def add_new_user(username, file_path):
 
     # ✅ Supports any audio format
     wav, sr = librosa.load(file_path, sr=16000)
+    wav = wav[:16000 * 3] 
     embed = encoder.embed_utterance(wav)
 
     user_ref = db.collection("voice_embeddings").document(username)
@@ -88,6 +89,7 @@ def recognize_speaker(file_path, database):
 
     # ✅ Supports any audio format
     wav, sr = librosa.load(file_path, sr=16000)
+    wav = wav[:16000 * 3] 
 
     if len(wav) < 16000:
         return "Invalid", 0.0, 0.0
