@@ -7,6 +7,5 @@ numpy
 scipy
 soundfile
 firebase-admin
-torch
 numba
-pydub
+
