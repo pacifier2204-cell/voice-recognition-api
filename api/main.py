@@ -1,10 +1,11 @@
 import os
 import shutil
 import uuid
+import subprocess
 from typing import List
 from fastapi import FastAPI, UploadFile, File, HTTPException
 
-from model.embedding_model import load_database, recognize_speaker, add_new_user
+from model.embedding_model import load_database, recognize_speaker, add_new_user,db
 
 app = FastAPI()
 
@@ -25,7 +26,7 @@ def load_model():
 
 load_model()
 
-import subprocess
+
 
 @app.get("/")
 def health_check():
@@ -66,7 +67,7 @@ def check_setup():
 # REGISTER VOICE
 # ================================
 @app.post("/register_voice")
-async def register_voice(username: str, files: List[UploadFile] = File(...)):
+async def register_voice(username: str, files: List[UploadFile] = File(default=...)):
 
     global database
 
@@ -106,7 +107,7 @@ async def register_voice(username: str, files: List[UploadFile] = File(...)):
 # VOICE RECOGNITION
 # ================================
 @app.post("/recognize_voice")
-async def recognize_voice(file: UploadFile = File(...)):
+async def recognize_voice(file: UploadFile = File(default=...)):
 
     global database
 
