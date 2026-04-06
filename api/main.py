@@ -79,20 +79,20 @@ async def register_voice(username: str, files: List[UploadFile] = File(default=.
         for file in files:
             temp_file = f"temp_{uuid.uuid4()}_{file.filename}"
             temp_files.append(temp_file)
-
             with open(temp_file, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
 
-            # Call add_new_user per file — core logic unchanged
-            _, sample_count, trained = add_new_user(username, temp_file)
+        # ✅ Run heavy processing in thread so server stays responsive
+        loop = asyncio.get_event_loop()
+        sample_count, trained = await loop.run_in_executor(
+            None, process_files, username, temp_files
+        )
 
     finally:
-        # ✅ Always clean up temp files, even if an exception occurred
         for f in temp_files:
             if os.path.exists(f):
                 os.remove(f)
 
-    # ✅ Single reload after all files in batch are processed
     database = load_database()
 
     return {
@@ -102,6 +102,14 @@ async def register_voice(username: str, files: List[UploadFile] = File(default=.
         "samples_required": 15
     }
 
+
+# ✅ New helper function — runs in separate thread
+def process_files(username, temp_files):
+    sample_count = 0
+    trained = False
+    for temp_file in temp_files:
+        _, sample_count, trained = add_new_user(username, temp_file)
+    return sample_count, trained
 
 # ================================
 # VOICE RECOGNITION
